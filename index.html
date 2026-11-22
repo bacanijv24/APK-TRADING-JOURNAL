@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Crypto Trading Journal</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#14171c;--muted:#6b7280;--line:#e5e7eb;--accent:#0f766e;--pos:#15803d;--neg:#b91c1c;--be:#1d4ed8;--warn:#b45309;--input:#fff;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1115;--card:#171a21;--text:#e5e7eb;--muted:#9aa3b2;--line:#2a2f3a;--accent:#2dd4bf;--pos:#4ade80;--neg:#f87171;--be:#60a5fa;--warn:#fbbf24;--input:#1e222b;color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);padding-bottom:env(safe-area-inset-bottom,0px)}
+header{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line);padding:env(safe-area-inset-top,0px) 12px 0}
+header h1{font-size:16px;margin:10px 0 4px}
+nav{display:flex;gap:2px;overflow-x:auto}
+nav button{flex:0 0 auto;border:0;background:none;padding:8px 10px;color:var(--muted);border-bottom:2px solid transparent;font:inherit;cursor:pointer}
+nav button.on{color:var(--accent);border-color:var(--accent);font-weight:600}
+main{padding:12px;max-width:1100px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
+.card h2{font-size:14px;margin:0 0 8px}
+.grid{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.grid2{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+.kpi .l{color:var(--muted);font-size:12px}
+.kpi .v{font-size:17px;font-weight:600;margin-top:2px}
+.form{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));margin-bottom:8px}
+label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+input,select,textarea{font:inherit;color:var(--text);background:var(--input);border:1px solid var(--line);border-radius:6px;padding:7px 8px;width:100%;min-width:0}
+textarea{min-height:56px;resize:vertical}
+.wide{grid-column:1/-1}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+button.btn,button.ghost,button.danger{font:inherit;border:1px solid var(--accent);border-radius:6px;padding:7px 12px;cursor:pointer}
+button.btn{background:var(--accent);color:#fff}
+button.ghost{background:none;color:var(--accent)}
+button.danger{background:none;border-color:var(--neg);color:var(--neg)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:6px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--muted);font-weight:500;font-size:12px}
+.r{text-align:right}
+.wrap{overflow-x:auto}
+.pos{color:var(--pos)}.neg{color:var(--neg)}.be{color:var(--be)}.warn{color:var(--warn)}.muted{color:var(--muted)}
+.tag{display:inline-block;padding:1px 6px;border-radius:99px;font-size:11px;border:1px solid var(--line);color:var(--muted)}
+.msg{padding:8px 10px;border-radius:6px;margin:8px 0;font-size:13px}
+.msg.err{background:rgba(185,28,28,.12);color:var(--neg)}
+.msg.ok{background:rgba(21,128,61,.12);color:var(--pos)}
+.preview{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;background:var(--bg);border-radius:8px;padding:10px;margin:8px 0}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal .h{font-size:11px;color:var(--muted);text-align:center}
+.day{min-height:58px;border:1px solid var(--line);border-radius:6px;padding:4px;font:inherit;color:var(--text);background:var(--input);text-align:left;cursor:pointer;display:flex;flex-direction:column}
+.day .n{font-size:11px;color:var(--muted)}
+.day .a{font-weight:600;font-size:12px;margin-top:auto}
+.day.p{background:rgba(21,128,61,.16)}
+.day.n2{background:rgba(185,28,28,.16)}
+.day.b{background:rgba(29,78,216,.16)}
+.day.f{border:1px dashed var(--warn)}
+.day.x{opacity:.3;cursor:default}
+.legend{font-size:12px;color:var(--muted);margin:6px 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>Crypto Trading Journal</h1>
+  <nav>
+    <button data-view="dash">Dashboard</button>
+    <button data-view="trades">Trades</button>
+    <button data-view="cal">Calendar</button>
+    <button data-view="cash">Cash</button>
+    <button data-view="rev">Review</button>
+    <button data-view="set">Settings</button>
+  </nav>
+</header>
+<main id="app"></main>
+<script>
+"use strict";
+(function(){
+
+/* ---------- constants & helpers ---------- */
+const KEY="crypto-journal-v1";
+const SESS=[[0,"Asia"],[7,"London"],[13,"Overlap"],[16,"New York"],[22,"Asia"]];
+const SESS_NAMES=["Asia","London","Overlap","New York"];
+const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+const $=id=>document.getElementById(id);
+const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const n=v=>(v===""||v==null||isNaN(Number(v)))?null:Number(v);
+const r2=x=>Math.round(x*100)/100;
+const sum=a=>a.reduce((s,x)=>s+(x||0),0);
+const avg=a=>a.length?sum(a)/a.length:null;
+const pad=x=>String(x).padStart(2,"0");
+const ts=(d,t)=>new Date(d+"T"+(t||"00:00")).getTime();
+const todayISO=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);};
+const nowHM=()=>{const d=new Date();return pad(d.getHours())+":"+pad(d.getMinutes());};
+const fm=v=>v==null?"—":Number(v).toFixed(2);
+const fmtN=(v,dp=2)=>v==null?"—":Number(v).toFixed(dp);
+const pct=v=>v==null?"—":(v*100).toFixed(2)+"%";
+const money=v=>v==null?'<span class="muted">—</span>':`<span class="${v>0?"pos":v<0?"neg":""}">${fm(v)}</span>`;
+const accNames=()=>S.settings.accounts.map(a=>a.name).filter(Boolean);
+const splitList=s=>String(s).split(",").map(x=>x.trim()).filter(Boolean);
+const dlist=(id,arr)=>`<datalist id="${id}">${arr.map(x=>`<option value="${esc(x)}">`).join("")}</datalist>`;
+
+/* ---------- state ---------- */
+function defaults(){
+  return {
+    settings:{includeSample:true,maxRisk:0.05,maxDaily:0.10,warn:0.8,tz:8,streak:2,baseCcy:"USD",
+      accounts:[
+        {name:"Bitunix Futures",broker:"Bitunix",ccy:"USD",start:null,startDate:"",maker:0.0002,taker:0.0006,exch:0,notes:"Bitunix USDT-M Futures VIP0. Verify at bitunix.com/service/handling-fee"},
+        {name:"Paper Trade",broker:"Demo",ccy:"USD",start:100.41,startDate:"2026-11-21",maker:0,taker:0,exch:0,notes:""}],
+      pairs:["BTCUSDT","ETHUSDT","SOLUSDT","ICNTUSDT","CYBERUSDT","RAREUSDT"],
+      strategies:["123 Strategy","Supply and Demand"],
+      setups:["Supply and Demand"],
+      timeframes:["1m","5m","15m","1H","4H","1D"],
+      macroRisk:["Risk-on","Risk-off"],
+      macroBias:["Bullish","Bearish","Neutral","Uptrend","Downtrend"],
+      market:["Trending","Ranging","Volatile","Uptrend","Downtrend","Correction"],
+      emotions:["Calm","Confident","Neutral","Anxious","FOMO","Frustrated","Greedy","Tired"]},
+    trades:[
+      sampleTrade("TR-261121-001","2026-11-21","22:01","2026-11-21","22:12","RAREUSDT","Long","1m","Risk-off","Bullish","Trending",0.01528,0.01487,0.0159,0.01593,1.5,9879.9486,"Calm","Confident",5,"Yes"),
+      sampleTrade("TR-261121-002","2026-11-21","23:47","2026-11-22","00:00","RAREUSDT","Long","1m","Risk-off","Bullish","Trending",0.01508,0.01466,0.01571,0.01467,1.5,10650.2766,"","",null,"")
+    ],
+    cash:[],reviews:[]
+  };
+}
+function sampleTrade(id,ed,et,xd,xt,pair,dir,tf,mr,mb,mkt,entry,stop,target,exit,risk,qty,emoB,emoA,disc,check){
+  return {id,rec:"SAMPLE",entryDate:ed,entryTime:et,exitDate:xd,exitTime:xt,account:"Paper Trade",pair,dir,
+    strategy:"123 Strategy",setup:"Supply and Demand",tf,macroRisk:mr,macroBias:mb,news:"No",market:mkt,
+    entry,stop,target,exit,risk,qty,fx:"",cEntry:0,cExit:0,exch:"",spread:"",sEntry:0,sExit:0,fund:"",other:"",
+    emoB,emoA,disc,check,entryReason:"",thesis:"",exitReason:"",notes:"",shotB:"",shotA:""};
+}
+function normalize(s){
+  const d=defaults();
+  return {settings:Object.assign(d.settings,s.settings||{}),
+    trades:Array.isArray(s.trades)?s.trades:[],
+    cash:Array.isArray(s.cash)?s.cash:[],
+    reviews:Array.isArray(s.reviews)?s.reviews:[]};
+}
+function load(){
+  try{const raw=localStorage.getItem(KEY);if(raw)return normalize(JSON.parse(raw));}catch(e){}
+  return defaults();
+}
+function save(){
+  try{localStorage.setItem(KEY,JSON.stringify(S));}
+  catch(e){flash={t:"err",m:"Could not save in this browser (storage blocked). Use Backup to keep your data."};}
+}
+
+let S=load();
+let view="dash",flash=null,TSEARCH="",calY=new Date().getFullYear(),calM=new Date().getMonth(),calAcc="All",calDay=null;
+const YR=new Date().getFullYear();
+const F={from:YR+"-01-01",to:YR+"-12-31",account:"All",pair:"All",strategy:"All",setup:"All",dir:"All",session:"All",bias:"All"};
+const DR={trade:null,orig:null,cash:null,origCash:null,rev:null,origRev:null,arm:null};
+
+/* ---------- calculation engine (ported from the workbook formulas) ---------- */
+function acct(name){return S.settings.accounts.find(a=>a.name===name);}
+function sessionFor(t){
+  if(!t.entryDate||!t.entryTime)return "";
+  const h=+t.entryTime.split(":")[0];
+  const u=((h-S.settings.tz)%24+24)%24;
+  let s="";
+  for(const [st,nm] of SESS) if(u>=st) s=nm;
+  return s;
+}
+function calc(t){
+  const a=acct(t.account)||{};
+  const sb=n(a.start);
+  const entry=n(t.entry),stop=n(t.stop),target=n(t.target),exit=n(t.exit),riskIn=n(t.risk),qtyIn=n(t.qty);
+  const fx=n(t.fx)??1;
+  const qty=qtyIn!=null?qtyIn:(riskIn!=null&&entry!=null&&stop!=null&&entry!==stop?riskIn/(Math.abs(entry-stop)*fx):null);
+  const fee=["cEntry","cExit","exch","spread","sEntry","sExit","fund","other"].reduce((s,k)=>s+(n(t[k])??0),0);
+  const short=t.dir==="Short";
+  const gross=(exit!=null&&qty!=null&&entry!=null)?(exit-entry)*qty*(short?-1:1)*fx:null;
+  let status;
+  if(exit==null) status="Open";
+  else if(entry==null||qty==null) status="Entry/size missing";
+  else if(["cEntry","cExit","sEntry","sExit"].some(k=>n(t[k])==null)) status="Fee data incomplete";
+  else status="Complete";
+  const net=status==="Complete"?gross-fee:null;
+  const result=net==null?status:(r2(net)>0?"Win":r2(net)<0?"Loss":"Breakeven");
+  const risk=riskIn!=null?riskIn:(entry!=null&&stop!=null&&qty!=null?Math.abs(entry-stop)*qty*fx:null);
+  const rr=(entry!=null&&stop!=null&&target!=null&&entry!==stop)?Math.abs(target-entry)/Math.abs(entry-stop):null;
+  const rMult=(net!=null&&risk)?net/risk:null;
+  const hold=(t.exitDate&&t.entryDate)?r2((ts(t.exitDate,t.exitTime)-ts(t.entryDate,t.entryTime))/3600000):null;
+  const ret=(net!=null&&sb)?net/sb:null;
+  const riskCheck=risk==null?"No risk data":(risk>S.settings.maxRisk*(sb||0)?"Over limit":"OK");
+  const included=!!t.exitDate&&(t.rec==="LIVE"||S.settings.includeSample);
+  const counted=included&&net!=null;
+  const estComm=(qty!=null&&a.taker!=null&&entry!=null)?qty*fx*a.taker*(entry+(exit!=null?exit:entry)):null;
+  return {qty,fee,gross,status,net,result,risk,rr,rMult,hold,ret,riskCheck,included,counted,session:sessionFor(t),estComm,fx};
+}
+const allC=()=>S.trades.map(t=>({t,c:calc(t)}));
+const cashOn=x=>x.rec==="LIVE"||S.settings.includeSample;
+function cashCalc(x){
+  const base=(n(x.amount)??0)*(n(x.rate)??1);
+  const fee=n(x.fee)??0;
+  return {base,fee,net:x.type==="Deposit"?base-fee:-(base+fee)};
+}
+function passes(t,c,f){
+  if(!c.included)return false;
+  if(f.from&&t.exitDate<f.from)return false;
+  if(f.to&&t.exitDate>f.to)return false;
+  const ok=(v,x)=>x==="All"||v===x;
+  return ok(t.account,f.account)&&ok(t.pair,f.pair)&&ok(t.strategy,f.strategy)&&ok(t.setup,f.setup)&&ok(t.dir,f.dir)&&ok(c.session,f.session)&&ok(t.macroBias,f.bias);
+}
+function dashData(){
+  const all=allC();
+  const rows=all.filter(x=>passes(x.t,x.c,F));
+  const cnt=rows.filter(x=>x.c.counted);
+  const accs=S.settings.accounts.filter(a=>F.account==="All"||a.name===F.account);
+  const start=sum(accs.map(a=>n(a.start)));
+  const cashIn=S.cash.filter(x=>cashOn(x)&&(F.account==="All"||x.account===F.account));
+  const inR=cashIn.filter(x=>x.date>=F.from&&x.date<=F.to);
+  const dep=sum(inR.filter(x=>x.type==="Deposit").map(x=>cashCalc(x).base));
+  const wd=sum(inR.filter(x=>x.type==="Withdrawal").map(x=>cashCalc(x).base));
+  const allCnt=all.filter(x=>x.c.counted&&(F.account==="All"||x.t.account===F.account));
+  const cur=start+sum(allCnt.map(x=>x.c.net))+sum(cashIn.map(x=>cashCalc(x).net));
+  const net=sum(cnt.map(x=>x.c.net)),gross=sum(cnt.map(x=>x.c.gross)),fees=sum(cnt.map(x=>x.c.fee));
+  const wins=cnt.filter(x=>x.c.result==="Win"),losses=cnt.filter(x=>x.c.result==="Loss");
+  const pos=sum(wins.map(x=>x.c.net)),neg=sum(losses.map(x=>x.c.net));
+  const denom=start+dep-wd;
+  const sorted=cnt.slice().sort((a,b)=>ts(a.t.exitDate,a.t.exitTime)-ts(b.t.exitDate,b.t.exitTime));
+  let cum=0,peak=0,dd=0;const eq=[];
+  for(const x of sorted){cum+=x.c.net;peak=Math.max(peak,cum);dd=Math.min(dd,cum-peak);eq.push(cum);}
+  let streak=0;for(let i=sorted.length-1;i>=0&&sorted[i].c.result==="Loss";i--)streak++;
+  const byDay={};for(const x of cnt)byDay[x.t.exitDate]=(byDay[x.t.exitDate]||0)+x.c.net;
+  const lim=start*S.settings.maxDaily;
+  const overDays=lim>0?Object.values(byDay).filter(v=>v<=-lim).length:0;
+  return {rows,cnt,start,dep,wd,cur,net,gross,fees,wins:wins.length,losses:losses.length,
+    be:cnt.length-wins.length-losses.length,incomplete:rows.length-cnt.length,
+    netRet:denom?net/denom:null,
+    winRate:cnt.length?wins.length/cnt.length:null,
+    pf:neg?pos/Math.abs(neg):(pos>0?Infinity:null),
+    expectancy:cnt.length?net/cnt.length:null,
+    avgWin:wins.length?pos/wins.length:null,
+    avgLoss:losses.length?neg/losses.length:null,
+    best:cnt.length?Math.max(...cnt.map(x=>x.c.net)):null,
+    worst:cnt.length?Math.min(...cnt.map(x=>x.c.net)):null,
+    avgRR:avg(rows.map(x=>x.c.rr).filter(v=>v!=null)),
+    avgR:avg(cnt.map(x=>x.c.rMult).filter(v=>v!=null)),
+    avgHold:avg(cnt.map(x=>x.c.hold).filter(v=>v!=null)),
+    dd,streak,overDays,eq};
+}
+
+/* ---------- ids & blanks ---------- */
+function genId(p,date){
+  const d=(date||todayISO()).replace(/-/g,"").slice(2);
+  const base=p+"-"+d+"-";
+  const list=p==="TR"?S.trades:S.cash;
+  let k=list.filter(x=>String(x.id).startsWith(base)).length+1;
+  const p3=x=>String(x).padStart(3,"0");
+  while(list.some(x=>x.id===base+p3(k)))k++;
+  return base+p3(k);
+}
+function blankTrade(){
+  return {id:genId("TR",todayISO()),rec:"LIVE",entryDate:todayISO(),entryTime:nowHM(),exitDate:"",exitTime:"",
+    account:accNames()[0]||"",pair:"",dir:"Long",strategy:"",setup:"",tf:"",macroRisk:"",macroBias:"",news:"No",market:"",
+    entry:"",stop:"",target:"",exit:"",risk:"",qty:"",fx:"",cEntry:"",cExit:"",exch:"",spread:"",sEntry:"",sExit:"",
+    fund:"",other:"",emoB:"",emoA:"",disc:"",check:"",entryReason:"",thesis:"",exitReason:"",notes:"",shotB:"",shotA:""};
+}
+function blankCash(){
+  return {id:genId("CF",todayISO()),rec:"LIVE",date:todayISO(),time:nowHM(),account:accNames()[0]||"",type:"Deposit",amount:"",rate:"",fee:"",notes:""};
+}
+function blankRev(){
+  return {rid:"RV-"+Date.now().toString(36),tid:"",date:todayISO(),plan:"",rating:"",right:"",fix:"",mistakes:"",lesson:"",action:""};
+}
+
+/* ---------- form field helpers ---------- */
+function fIn(sc,k,label,type="text"){
+  const v=esc(DR[sc][k]??"");
+  return `<label>${label}<input type="${type}"${type==="number"?' step="any"':""} data-scope="${sc}" data-k="${k}" value="${v}"></label>`;
+}
+function fList(sc,k,label,list){
+  return `<label>${label}<input list="${list}" data-scope="${sc}" data-k="${k}" value="${esc(DR[sc][k]??"")}"></label>`;
+}
+function fSel(sc,k,label,opts){
+  const v=String(DR[sc][k]??"");
+  return `<label>${label}<select data-scope="${sc}" data-k="${k}"><option value="">—</option>${opts.map(o=>`<option value="${esc(o)}"${o===v?" selected":""}>${esc(o)}</option>`).join("")}</select></label>`;
+}
+function fArea(sc,k,label,cls){
+  return `<label class="${cls||""}">${label}<textarea data-scope="${sc}" data-k="${k}">${esc(DR[sc][k]??"")}</textarea></label>`;
+}
+
+/* ---------- shared table ---------- */
+function tradeTable(list){
+  if(!list.length)return '<p class="muted">No trades.</p>';
+  return `<div class="wrap"><table><thead><tr><th>ID</th><th>Entry</th><th>Exit</th><th>Account</th><th>Pair</th><th>Dir</th><th>Strategy</th><th class="r">Gross</th><th class="r">Net</th><th>Result</th></tr></thead><tbody>${
+    list.map(x=>{const t=x.t,c=x.c;return `<tr data-act="editTrade" data-id="${esc(t.id)}" style="cursor:pointer"><td>${esc(t.id)}${t.rec==="SAMPLE"?' <span class="tag">SAMPLE</span>':""}</td><td>${esc(t.entryDate)} ${esc(t.entryTime)}</td><td>${esc(t.exitDate||"")} ${esc(t.exitTime||"")}</td><td>${esc(t.account)}</td><td>${esc(t.pair)}</td><td>${esc(t.dir)}</td><td>${esc(t.strategy)}</td><td class="r">${money(c.gross)}</td><td class="r">${money(c.net)}</td><td>${esc(c.result)}</td></tr>`;}).join("")
+  }</tbody></table></div>`;
+}
+
+/* ---------- DASHBOARD ---------- */
+function eqSvg(vals){
+  if(vals.length<2)return '<p class="muted">No counted trades in this filter yet.</p>';
+  const W=600,H=160,P=8;
+  const all=[0,...vals];
+  const mn=Math.min(...all),mx=Math.max(...all),span=(mx-mn)||1;
+  const X=i=>P+i*(W-2*P)/(all.length-1);
+  const Y=v=>H-P-(v-mn)/span*(H-2*P);
+  const d=all.map((v,i)=>`${i?"L":"M"}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Equity curve"><line x1="${P}" x2="${W-P}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line)"/><path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2"/></svg>`;
+}
+function brk(rows,fn){
+  const m={};
+  for(const x of rows){
+    const k=fn(x)||"(blank)";
+    const o=m[k]||(m[k]={n:0,c:0,net:0,w:0});
+    o.n++;
+    if(x.c.counted){o.c++;o.net+=x.c.net;if(x.c.result==="Win")o.w++;}
+  }
+  return Object.entries(m).sort((a,b)=>b[1].net-a[1].net);
+}
+function brkTable(title,rows,fn){
+  const data=brk(rows,fn);
+  return `<div class="card"><h2>${title}</h2>${data.length?`<div class="wrap"><table><thead><tr><th>Name</th><th class="r">Trades</th><th class="r">Net</th><th class="r">Win %</th></tr></thead><tbody>${
+    data.map(([k,o])=>`<tr><td>${esc(k)}</td><td class="r">${o.n}</td><td class="r">${money(o.c?r2(o.net):null)}</td><td class="r">${o.c?(o.w/o.c*100).toFixed(0)+"%":"—"}</td></tr>`).join("")
+  }</tbody></table></div>`:'<p class="muted">No trades in this filter.</p>'}</div>`;
+}
+function viewDash(){
+  const A=S.settings,d=dashData();
+  const sel=(f,label,opts)=>`<label>${label}<select data-f="${f}">${["All",...opts].map(o=>`<option value="${esc(o)}"${o===F[f]?" selected":""}>${esc(o)}</option>`).join("")}</select></label>`;
+  const K=[
+    ["Starting balance",money(d.start)],["Deposits (range)",money(d.dep)],["Withdrawals (range)",money(d.wd)],["Current balance (all-time)",money(d.cur)],
+    ["Net trading P&L",money(d.net)],["Gross P&L",money(d.gross)],["Total fees",money(d.fees)],["Net return %",pct(d.netRet)],
+    ["Closed trades",d.rows.length],["Counted (complete fees)",d.cnt.length],["Incomplete fee/data",d.incomplete],["Wins / Losses / BE",`${d.wins} / ${d.losses} / ${d.be}`],
+    ["Win rate",pct(d.winRate)],["Profit factor",d.pf==null?"—":isFinite(d.pf)?d.pf.toFixed(2):"no losses"],["Expectancy / trade",money(d.expectancy)],
+    ["Avg win",money(d.avgWin)],["Avg loss",money(d.avgLoss)],["Biggest win",money(d.best)],["Biggest loss",money(d.worst)],
+    ["Avg planned R:R",fmtN(d.avgRR)],["Avg realized R",fmtN(d.avgR)],["Avg holding (hrs)",fmtN(d.avgHold)],["Max drawdown",money(d.dd)]
+  ];
+  const sess=SESS_NAMES;
+  return `
+  <div class="card"><h2>Filters</h2><div class="form">
+    <label>From<input type="date" data-f="from" value="${F.from}"></label>
+    <label>To<input type="date" data-f="to" value="${F.to}"></label>
+    ${sel("account","Account",accNames())}
+    ${sel("pair","Pair",A.pairs)}
+    ${sel("strategy","Strategy",A.strategies)}
+    ${sel("setup","Setup",A.setups)}
+    ${sel("dir","Direction",["Long","Short"])}
+    ${sel("session","Session",sess)}
+    ${sel("bias","Macro bias",A.macroBias)}
+  </div>
+  <div class="muted" style="font-size:12px">Base currency: ${esc(A.baseCcy)} · Gross = before fees · Net = after fees · P&amp;L is recognized on the exit date.</div></div>
+  ${d.incomplete?`<div class="msg err">${d.incomplete} trade(s) in this filter have incomplete fee or entry data, so they are excluded from Net until completed.</div>`:""}
+  ${d.overDays?`<div class="msg err">${d.overDays} day(s) hit the max daily loss of ${pct(A.maxDaily)} of starting balance.</div>`:""}
+  ${A.streak>0&&d.streak>=A.streak?`<div class="msg err">Loss streak: ${d.streak} in a row (limit ${A.streak}).</div>`:""}
+  <div class="card"><h2>Performance</h2><div class="grid">${K.map(([l,v])=>`<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div></div>`).join("")}</div></div>
+  <div class="card"><h2>Equity curve (net, counted trades)</h2>${eqSvg(d.eq)}</div>
+  <div class="grid2">
+    ${brkTable("By strategy",d.rows,x=>x.t.strategy)}
+    ${brkTable("By setup",d.rows,x=>x.t.setup)}
+    ${brkTable("By pair",d.rows,x=>x.t.pair)}
+    ${brkTable("By session",d.rows,x=>x.c.session)}
+    ${brkTable("By market condition",d.rows,x=>x.t.market)}
+    ${brkTable("By emotion before",d.rows,x=>x.t.emoB)}
+  </div>`;
+}
+
+/* ---------- TRADES ---------- */
+function tradeListHtml(){
+  const q=TSEARCH.trim().toLowerCase();
+  const list=allC()
+    .filter(x=>!q||[x.t.id,x.t.pair,x.t.strategy,x.t.setup,x.t.account,x.t.dir].join(" ").toLowerCase().includes(q))
+    .sort((a,b)=>ts(b.t.entryDate,b.t.entryTime)-ts(a.t.entryDate,a.t.entryTime));
+  return list.length?tradeTable(list):'<p class="muted">No trades yet. Tap “+ New trade”.</p>';
+}
+function viewTrades(){
+  if(DR.trade)return tradeFormHtml();
+  return `<div class="row"><button class="btn" data-act="newTrade">+ New trade</button>
+    <input data-search placeholder="Search ID, pair, strategy…" value="${esc(TSEARCH)}" style="max-width:280px"></div>
+    <div class="card" id="tlist">${tradeListHtml()}</div>`;
+}
+function tradeFormHtml(){
+  const A=S.settings,sc="trade";
+  return `<div class="card"><h2>${DR.orig?"Edit trade":"New trade"}</h2>
+  ${dlist("dl-pair",A.pairs)}${dlist("dl-strategy",A.strategies)}${dlist("dl-setup",A.setups)}${dlist("dl-tf",A.timeframes)}
+  <h2>Trade info</h2>
+  <div class="form">
+    ${fIn(sc,"id","Trade ID (req)")}
+    ${fSel(sc,"rec","Record type",["LIVE","SAMPLE"])}
+    ${fIn(sc,"entryDate","Entry date (req)","date")}
+    ${fIn(sc,"entryTime","Entry time (req)","time")}
+    ${fIn(sc,"exitDate","Exit date (if closed)","date")}
+    ${fIn(sc,"exitTime","Exit time (if closed)","time")}
+    ${fSel(sc,"account","Account (req)",accNames())}
+    ${fList(sc,"pair","Pair (req)","dl-pair")}
+    ${fSel(sc,"dir","Direction (req)",["Long","Short"])}
+    ${fList(sc,"strategy","Strategy (req)","dl-strategy")}
+    ${fList(sc,"setup","Setup (req)","dl-setup")}
+    ${fList(sc,"tf","Timeframe","dl-tf")}
+    ${fSel(sc,"macroRisk","Macro risk-on/off",A.macroRisk)}
+    ${fSel(sc,"macroBias","Macro bias",A.macroBias)}
+    ${fSel(sc,"news","High-impact news",["Yes","No"])}
+    ${fSel(sc,"market","Market condition",A.market)}
+  </div>
+  <h2>Price & size</h2>
+  <div class="form">
+    ${fIn(sc,"entry","Entry price (req)","number")}
+    ${fIn(sc,"stop","Stop-loss (req)","number")}
+    ${fIn(sc,"target","Target price","number")}
+    ${fIn(sc,"exit","Exit price (if closed)","number")}
+    ${fIn(sc,"risk","Planned risk, base (optional)","number")}
+    ${fIn(sc,"qty","Position qty (optional)","number")}
+    ${fIn(sc,"fx","FX to base (blank = 1)","number")}
+  </div>
+  <h2>Fees & costs, actual, base currency</h2>
+  <p class="muted" style="margin:0 0 6px;font-size:12px">Commission and slippage (entry and exit) are required for Net P&amp;L. Other fees left blank count as 0.</p>
+  <div class="form">
+    ${fIn(sc,"cEntry","Commission entry (req)","number")}
+    ${fIn(sc,"cExit","Commission exit (req)","number")}
+    ${fIn(sc,"sEntry","Slippage entry (req)","number")}
+    ${fIn(sc,"sExit","Slippage exit (req)","number")}
+    ${fIn(sc,"exch","Exchange / regulatory fee","number")}
+    ${fIn(sc,"spread","Spread cost","number")}
+    ${fIn(sc,"fund","Funding / swap / borrow","number")}
+    ${fIn(sc,"other","Other fees","number")}
+  </div>
+  <h2>Psychology & notes</h2>
+  <div class="form">
+    ${fSel(sc,"emoB","Emotion before",A.emotions)}
+    ${fSel(sc,"emoA","Emotion after",A.emotions)}
+    ${fSel(sc,"disc","Discipline (1-5)",["1","2","3","4","5"])}
+    ${fSel(sc,"check","Checklist done",["Yes","Partial","No"])}
+    ${fArea(sc,"entryReason","Entry reason","wide")}
+    ${fArea(sc,"thesis","Trade thesis","wide")}
+    ${fArea(sc,"exitReason","Exit reason","wide")}
+    ${fArea(sc,"notes","Execution notes","wide")}
+    ${fIn(sc,"shotB","Before screenshot (link)")}
+    ${fIn(sc,"shotA","After screenshot (link)")}
+  </div>
+  <h2>Live calculation</h2>
+  <div class="preview" id="prev"></div>
+  <div class="row"><button class="btn" data-act="saveTrade">Save trade</button><button class="ghost" data-act="cancelTrade">Cancel</button><button class="ghost" data-act="newId">New ID</button>${DR.orig?`<button class="danger" data-act="delTrade">${DR.arm==="trade:"+DR.orig?"Tap again to delete":"Delete"}</button>`:""}</div>
+  </div>`;
+}
+function updPreview(){
+  const el=$("prev");if(!el||!DR.trade)return;
+  const c=calc(DR.trade);
+  const items=[["Session",esc(c.session||"—")],["Qty",fmtN(c.qty,4)],["Planned risk",fm(c.risk)],["Planned R:R",fmtN(c.rr)],
+    ["Est. commission (ref.)",fm(c.estComm)],["Total fees",fm(c.fee)],["Gross P&L",money(c.gross)],["Net P&L",money(c.net)],
+    ["Status",esc(c.status)],["Result",esc(c.result)],["Realized R",fmtN(c.rMult)],["Holding (hrs)",fmtN(c.hold)],
+    ["Risk check",`<span class="${c.riskCheck==="Over limit"?"neg":""}">${esc(c.riskCheck)}</span>`]];
+  el.innerHTML=items.map(([l,v])=>`<div><div class="muted" style="font-size:12px">${l}</div><div><b>${v}</b></div></div>`).join("");
+}
+function validateTrade(D,orig){
+  const e=[];
+  const req={id:"Trade ID",entryDate:"Entry date",entryTime:"Entry time",account:"Account",pair:"Pair",dir:"Direction",strategy:"Strategy",setup:"Setup",entry:"Entry price",stop:"Stop-loss"};
+  for(const k in req) if(D[k]===""||D[k]==null) e.push(req[k]+" is required.");
+  const en=n(D.entry),st=n(D.stop),tg=n(D.target),ex=n(D.exit);
+  if(en!=null&&st!=null){
+    if(en===st) e.push("Entry and stop-loss must differ.");
+    else if(D.dir==="Long"&&st>=en) e.push("Long: stop-loss must be below entry.");
+    else if(D.dir==="Short"&&st<=en) e.push("Short: stop-loss must be above entry.");
+  }
+  if(en!=null&&tg!=null){
+    if(D.dir==="Long"&&tg<=en) e.push("Long: target must be above entry.");
+    if(D.dir==="Short"&&tg>=en) e.push("Short: target must be below entry.");
+  }
+  if(D.exitDate&&ex==null) e.push("Exit price is required when the exit date is set.");
+  if(ex!=null&&!D.exitDate) e.push("Set the exit date for a closed trade.");
+  if(D.exitDate&&D.entryDate&&ts(D.exitDate,D.exitTime)<ts(D.entryDate,D.entryTime)) e.push("Exit is earlier than entry.");
+  if(D.id&&S.trades.some(t=>t.id===D.id&&t.id!==orig)) e.push("Trade ID already exists.");
+  return e;
+}
+function saveTrade(){
+  const D=DR.trade;
+  const errs=validateTrade(D,DR.orig);
+  if(errs.length){flash={t:"err",m:errs.join(" ")};render();return;}
+  const clean=Object.assign({},D);
+  const i=DR.orig?S.trades.findIndex(t=>t.id===DR.orig):-1;
+  if(i>=0)S.trades[i]=clean;else S.trades.push(clean);
+  for(const [k,list] of [["pair","pairs"],["strategy","strategies"],["setup","setups"],["tf","timeframes"]]){
+    if(clean[k]&&!S.settings[list].includes(clean[k]))S.settings[list].push(clean[k]);
+  }
+  save();
+  DR.trade=null;DR.orig=null;DR.arm=null;view="trades";
+  flash={t:"ok",m:"Trade saved."};render();
+}
+function delTrade(){
+  if(DR.arm==="trade:"+DR.orig){
+    S.trades=S.trades.filter(t=>t.id!==DR.orig);save();
+    DR.trade=null;DR.orig=null;DR.arm=null;
+    flash={t:"ok",m:"Trade deleted."};
+  }else DR.arm="trade:"+DR.orig;
+  render();
+}
+
+/* ---------- CALENDAR ---------- */
+function viewCal(){
+  const accSel=`<select data-cal="a">${["All",...accNames()].map(o=>`<option value="${esc(o)}"${o===calAcc?" selected":""}>${esc(o)}</option>`).join("")}</select>`;
+  const mSel=`<select data-cal="m">${MONTHS.map((m,i)=>`<option value="${i}"${i===calM?" selected":""}>${m}</option>`).join("")}</select>`;
+  const ySel=`<input type="number" data-cal="y" value="${calY}" style="max-width:110px">`;
+  const inc=allC().filter(x=>x.c.included&&(calAcc==="All"||x.t.account===calAcc));
+  const dm={};
+  for(const x of inc){
+    const k=x.t.exitDate;
+    const o=dm[k]||(dm[k]={net:0,c:0,inc:0,trades:0});
+    o.trades++;
+    if(x.c.counted){o.c++;o.net+=x.c.net;}else o.inc++;
+  }
+  const first=new Date(calY,calM,1).getDay();
+  const days=new Date(calY,calM+1,0).getDate();
+  const pref=calY+"-"+pad(calM+1);
+  let cells=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(h=>`<div class="h">${h}</div>`).join("");
+  for(let i=0;i<first;i++)cells+=`<div></div>`;
+  let mNet=0,mTr=0,gDays=0,rDays=0,mInc=0;
+  for(let d=1;d<=days;d++){
+    const key=pref+"-"+pad(d);
+    const s=dm[key];
+    let cls="day",body="";
+    if(s){
+      mTr+=s.trades;mInc+=s.inc;
+      if(s.c){
+        const v=r2(s.net);mNet+=v;
+        cls+=v>0?" p":v<0?" n2":" b";
+        if(v>0)gDays++;else if(v<0)rDays++;
+        body+=`<span class="a">${money(v)}</span>`;
+      }
+      if(s.inc)body+=`<span class="warn" style="font-size:10px">Fee incomplete</span>`;
+      if(!s.c)cls+=" f";
+    }
+    cells+=`<button class="${cls}" data-act="calDay" data-day="${key}"><span class="n">${d}</span>${body}</button>`;
+  }
+  const detail=calDay?`<div class="card"><h2>Trades on ${esc(calDay)}</h2>${tradeTable(inc.filter(x=>x.t.exitDate===calDay))}</div>`:"";
+  return `
+  <div class="row"><button class="ghost" data-act="calNav" data-dir="-1">◀</button>${mSel}${ySel}${accSel}<button class="ghost" data-act="calNav" data-dir="1">▶</button></div>
+  <div class="card"><h2>${MONTHS[calM]} ${calY}</h2><div class="cal">${cells}</div>
+    <div class="legend">Green = profit · Red = loss · Blue = breakeven · Dashed = fee data incomplete · Tap a day for its trades.</div></div>
+  <div class="card"><h2>Month summary</h2><div class="grid">
+    ${[["Net P&L",money(r2(mNet))],["Trades",mTr],["Green days",gDays],["Red days",rDays],["Fee incomplete",mInc]].map(([l,v])=>`<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div></div>`).join("")}
+  </div></div>
+  ${detail}`;
+}
+
+/* ---------- CASH ---------- */
+function viewCash(){
+  const A=S.settings,D=DR.cash,sc="cash";
+  let form="";
+  if(D){
+    form=`<div class="card"><h2>${DR.origCash?"Edit cash flow":"New deposit / withdrawal"}</h2>
+    <div class="form">
+      ${fIn(sc,"id","Transaction ID")}
+      ${fSel(sc,"rec","Record type",["LIVE","SAMPLE"])}
+      ${fIn(sc,"date","Date (req)","date")}
+      ${fIn(sc,"time","Time","time")}
+      ${fSel(sc,"account","Account (req)",accNames())}
+      ${fSel(sc,"type","Deposit / withdrawal (req)",["Deposit","Withdrawal"])}
+      ${fIn(sc,"amount","Amount, txn currency (req)","number")}
+      ${fIn(sc,"rate","Rate to base (blank = 1)","number")}
+      ${fIn(sc,"fee","Transaction fee, base","number")}
+      ${fArea(sc,"notes","Notes","wide")}
+    </div>
+    <div class="row"><button class="btn" data-act="saveCash">Save</button><button class="ghost" data-act="cancelCash">Cancel</button>${DR.origCash?`<button class="danger" data-act="delCash">${DR.arm==="cash:"+DR.origCash?"Tap again to delete":"Delete"}</button>`:""}</div></div>`;
+  }
+  const AC=allC();
+  const bal=A.accounts.filter(a=>a.name).map(a=>{
+    const tp=sum(AC.filter(x=>x.c.counted&&x.t.account===a.name).map(x=>x.c.net));
+    const cs=S.cash.filter(x=>cashOn(x)&&x.account===a.name);
+    const cn=sum(cs.map(x=>cashCalc(x).net));
+    const bl=(n(a.start)??0)+tp+cn;
+    return `<tr><td>${esc(a.name)}</td><td class="r">${fm(n(a.start))}</td><td class="r">${fm(sum(cs.filter(x=>x.type==="Deposit").map(x=>cashCalc(x).base)))}</td><td class="r">${fm(sum(cs.filter(x=>x.type==="Withdrawal").map(x=>cashCalc(x).base)))}</td><td class="r">${money(r2(tp))}</td><td class="r">${fm(cn)}</td><td class="r"><b>${fm(bl)}</b></td></tr>`;
+  }).join("");
+  const list=S.cash.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)))
+    .map(x=>{const cc=cashCalc(x);return `<tr data-act="editCash" data-id="${esc(x.id)}" style="cursor:pointer"><td>${esc(x.id)}${x.rec==="SAMPLE"?' <span class="tag">SAMPLE</span>':""}</td><td>${esc(x.date)}</td><td>${esc(x.account)}</td><td>${esc(x.type)}</td><td class="r">${fm(n(x.amount))}</td><td class="r">${fm(cc.base)}</td><td class="r">${fm(cc.net)}</td><td>${esc(x.notes||"")}</td></tr>`;}).join("");
+  return `
+  <div class="row"><button class="btn" data-act="newCash">+ Deposit / withdrawal</button></div>
+  ${form}
+  <div class="card"><h2>Balance per account</h2><div class="wrap"><table><thead><tr><th>Account</th><th class="r">Start</th><th class="r">Deposits</th><th class="r">Withdrawals</th><th class="r">Trading P&amp;L</th><th class="r">Cash effect (fees)</th><th class="r">Balance</th></tr></thead><tbody>${bal||'<tr><td colspan="7" class="muted">Add an account in Settings.</td></tr>'}</tbody></table></div>
+  <p class="muted" style="font-size:12px">Cash flows are separate from trading P&amp;L and do not change the equity curve.</p></div>
+  <div class="card"><h2>Transactions</h2>${list?`<div class="wrap"><table><thead><tr><th>ID</th><th>Date</th><th>Account</th><th>Type</th><th class="r">Amount</th><th class="r">Base</th><th class="r">Net effect</th><th>Notes</th></tr></thead><tbody>${list}</tbody></table></div>`:'<p class="muted">No deposits or withdrawals yet.</p>'}</div>`;
+}
+function saveCash(){
+  const D=DR.cash,e=[];
+  if(!D.id)e.push("Transaction ID is required.");
+  if(!D.date)e.push("Date is required.");
+  if(!D.account)e.push("Account is required.");
+  if(!D.type)e.push("Choose Deposit or Withdrawal.");
+  if(n(D.amount)==null||n(D.amount)<=0)e.push("Amount must be above 0.");
+  if(S.cash.some(x=>x.id===D.id&&x.id!==DR.origCash))e.push("Transaction ID already exists.");
+  if(e.length){flash={t:"err",m:e.join(" ")};render();return;}
+  const i=DR.origCash?S.cash.findIndex(x=>x.id===DR.origCash):-1;
+  if(i>=0)S.cash[i]=Object.assign({},D);else S.cash.push(Object.assign({},D));
+  save();DR.cash=null;DR.origCash=null;DR.arm=null;
+  flash={t:"ok",m:"Transaction saved."};render();
+}
+
+/* ---------- REVIEW ---------- */
+function viewRev(){
+  const sc="rev",D=DR.rev;
+  let form="";
+  if(D){
+    form=`<div class="card"><h2>${DR.origRev?"Edit review":"New review"}</h2>
+    ${dlist("dl-tid",S.trades.map(t=>t.id))}
+    <div class="form">
+      ${fList(sc,"tid","Trade ID (req)","dl-tid")}
+      ${fIn(sc,"date","Review date (req)","date")}
+      ${fSel(sc,"plan","Followed plan? (req)",["Yes","Partially","No"])}
+      ${fIn(sc,"rating","Self-rating (1-10)","number")}
+      ${fArea(sc,"right","What went right","wide")}
+      ${fArea(sc,"fix","What needs fixing","wide")}
+      ${fArea(sc,"mistakes","Mistakes","wide")}
+      ${fArea(sc,"lesson","Lesson","wide")}
+      ${fArea(sc,"action","Action item","wide")}
+    </div>
+    <div class="row"><button class="btn" data-act="saveRev">Save review</button><button class="ghost" data-act="cancelRev">Cancel</button>${DR.origRev?`<button class="danger" data-act="delRev">${DR.arm==="rev:"+DR.origRev?"Tap again to delete":"Delete"}</button>`:""}</div></div>`;
+  }
+  const AC=allC();
+  const sumRows=["Yes","Partially","No"].map(p=>{
+    const rs=S.reviews.filter(r=>r.plan===p);
+    const net=sum(rs.map(r=>{const x=AC.find(a=>a.t.id===r.tid);return x&&x.c.counted?x.c.net:0;}));
+    const rat=rs.map(r=>n(r.rating)).filter(v=>v!=null);
+    return `<tr><td>${p}</td><td class="r">${rs.length}</td><td class="r">${money(r2(net))}</td><td class="r">${rat.length?avg(rat).toFixed(1):"—"}</td></tr>`;
+  }).join("");
+  const list=S.reviews.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)))
+    .map(r=>{const x=AC.find(a=>a.t.id===r.tid);return `<tr data-act="editRev" data-id="${esc(r.rid)}" style="cursor:pointer"><td>${esc(r.date)}</td><td>${esc(r.tid)}</td><td>${esc(x?x.t.pair:"")}</td><td>${esc(x?x.t.strategy:"")}</td><td>${esc(r.plan)}</td><td class="r">${esc(r.rating)}</td><td class="r">${money(x&&x.c.counted?x.c.net:null)}</td><td>${esc(r.lesson||"")}</td></tr>`;}).join("");
+  return `
+  <div class="row"><button class="btn" data-act="newRev">+ New review</button></div>
+  ${form}
+  <div class="card"><h2>Summary by plan followed</h2><div class="wrap"><table><thead><tr><th>Followed plan?</th><th class="r">Reviews</th><th class="r">Net P&amp;L</th><th class="r">Avg self-rating</th></tr></thead><tbody>${sumRows}</tbody></table></div></div>
+  <div class="card"><h2>Reviews</h2>${list?`<div class="wrap"><table><thead><tr><th>Date</th><th>Trade ID</th><th>Pair</th><th>Strategy</th><th>Plan</th><th class="r">Rating</th><th class="r">Net</th><th>Lesson</th></tr></thead><tbody>${list}</tbody></table></div>`:'<p class="muted">No reviews yet.</p>'}</div>`;
+}
+function saveRev(){
+  const D=DR.rev,e=[];
+  if(!D.tid)e.push("Trade ID is required.");
+  else if(!S.trades.some(t=>t.id===D.tid))e.push("Trade ID not found in Trades.");
+  if(!D.date)e.push("Review date is required.");
+  if(!D.plan)e.push("Choose whether the plan was followed.");
+  const rt=n(D.rating);
+  if(rt!=null&&(rt<1||rt>10))e.push("Rating must be 1 to 10.");
+  if(e.length){flash={t:"err",m:e.join(" ")};render();return;}
+  const i=DR.origRev?S.reviews.findIndex(r=>r.rid===DR.origRev):-1;
+  if(i>=0)S.reviews[i]=Object.assign({},D);else S.reviews.push(Object.assign({},D));
+  save();DR.rev=null;DR.origRev=null;DR.arm=null;
+  flash={t:"ok",m:"Review saved."};render();
+}
+
+/* ---------- SETTINGS ---------- */
+function gather(){
+  if(!$("s_risk"))return;
+  const v=id=>$(id).value;
+  const A=S.settings;
+  A.baseCcy=v("s_base").trim()||"USD";
+  A.includeSample=v("s_inc")==="Yes";
+  A.maxRisk=(n(v("s_risk"))??5)/100;
+  A.maxDaily=(n(v("s_daily"))??10)/100;
+  A.warn=(n(v("s_warn"))??80)/100;
+  A.tz=n(v("s_tz"))??0;
+  A.streak=n(v("s_streak"))??2;
+  A.accounts=[...document.querySelectorAll(".acc")].map(el=>{
+    const f=k=>el.querySelector(`[data-af="${k}"]`).value;
+    return {name:f("name").trim(),broker:f("broker").trim(),ccy:f("ccy").trim()||"USD",start:n(f("start")),
+      startDate:f("startDate"),maker:(n(f("maker"))??0)/100,taker:(n(f("taker"))??0)/100,exch:(n(f("exch"))??0)/100,notes:f("notes")};
+  });
+  for(const k of ["pairs","strategies","setups","timeframes","macroRisk","macroBias","market","emotions"])A[k]=splitList(v("l_"+k));
+}
+function viewSet(){
+  const A=S.settings;
+  const pc=v=>+((v||0)*100).toFixed(6);
+  const acc=A.accounts.map((a,i)=>`<div class="acc card" style="margin:0 0 8px">
+    <div class="form">
+      <label>Name<input data-af="name" value="${esc(a.name)}"></label>
+      <label>Broker<input data-af="broker" value="${esc(a.broker)}"></label>
+      <label>Currency<input data-af="ccy" value="${esc(a.ccy)}"></label>
+      <label>Starting balance (base)<input type="number" step="any" data-af="start" value="${esc(a.start??"")}"></label>
+      <label>Start date<input type="date" data-af="startDate" value="${esc(a.startDate||"")}"></label>
+      <label>Maker fee %<input type="number" step="any" data-af="maker" value="${pc(a.maker)}"></label>
+      <label>Taker fee %<input type="number" step="any" data-af="taker" value="${pc(a.taker)}"></label>
+      <label>Exchange/reg fee %<input type="number" step="any" data-af="exch" value="${pc(a.exch)}"></label>
+      <label class="wide">Notes<input data-af="notes" value="${esc(a.notes||"")}"></label>
+    </div>
+    <div class="row"><button class="danger" data-act="rmAcc" data-i="${i}">Remove account</button></div></div>`).join("");
+  const lst=(k,label)=>`<label class="wide">${label}<textarea id="l_${k}">${esc(A[k].join(", "))}</textarea></label>`;
+  return `
+  <div class="card"><h2>General & risk</h2><div class="form">
+    <label>Base currency label<input id="s_base" value="${esc(A.baseCcy)}"></label>
+    <label>Include SAMPLE data<select id="s_inc"><option value="Yes"${A.includeSample?" selected":""}>Yes</option><option value="No"${A.includeSample?"":" selected"}>No</option></select></label>
+    <label>Max risk per trade (% of account)<input type="number" step="any" id="s_risk" value="${+(A.maxRisk*100).toFixed(4)}"></label>
+    <label>Max daily loss (% of account)<input type="number" step="any" id="s_daily" value="${+(A.maxDaily*100).toFixed(4)}"></label>
+    <label>Warn at (% of max daily loss)<input type="number" step="any" id="s_warn" value="${+(A.warn*100).toFixed(4)}"></label>
+    <label>Entry time zone (UTC offset, hours)<input type="number" step="any" id="s_tz" value="${A.tz}"></label>
+    <label>Loss streak limit<input type="number" id="s_streak" value="${A.streak}"></label>
+  </div></div>
+  <div class="card"><h2>Accounts & fees</h2>
+    <p class="muted" style="font-size:12px">Renaming an account does not update existing trades. Fee % is a reference estimate only; enter actual fees on each trade.</p>
+    ${acc}<button class="ghost" data-act="addAcc">+ Add account</button></div>
+  <div class="card"><h2>Dropdown lists</h2><p class="muted" style="font-size:12px">Comma-separated. Pairs, strategies and setups you type on a trade are also added automatically.</p>
+    <div class="form">${lst("pairs","Pairs")}${lst("strategies","Strategies")}${lst("setups","Setups")}${lst("timeframes","Timeframes")}${lst("macroRisk","Macro risk-on/off")}${lst("macroBias","Macro bias")}${lst("market","Market conditions")}${lst("emotions","Emotions")}</div></div>
+  <div class="row"><button class="btn" data-act="saveSettings">Save settings</button></div>
+  <div class="card"><h2>Backup & restore</h2>
+    <p class="muted" style="font-size:12px">Your data is stored only in this browser. Copy the backup regularly. To move to another device (or your Android app), copy the backup there and paste it into Import.</p>
+    <textarea id="bk" readonly style="min-height:110px;font-family:monospace;font-size:11px">${esc(JSON.stringify(S))}</textarea>
+    <div class="row"><button class="ghost" data-act="copyBk">Copy backup</button><span id="cpmsg" class="muted" style="font-size:12px"></span></div>
+    <label>Paste a backup to restore (replaces all current data)<textarea id="bkin" placeholder="Paste backup JSON here"></textarea></label>
+    <div class="row"><input id="bkok" placeholder="Type REPLACE or RESET" style="max-width:220px"><button class="danger" data-act="importBk">Import & replace</button><button class="danger" data-act="resetAll">Erase all data</button></div>
+  </div>`;
+}
+function importBk(){
+  const ok=$("bkok").value.trim();
+  if(ok!=="REPLACE"){flash={t:"err",m:'Type REPLACE in the box to import.'};render();return;}
+  try{
+    const obj=JSON.parse($("bkin").value);
+    if(!obj||!obj.settings||!Array.isArray(obj.trades))throw new Error("not a journal backup.");
+    S=normalize(obj);save();flash={t:"ok",m:"Backup imported."};
+  }catch(e){flash={t:"err",m:"Import failed: "+e.message};}
+  render();
+}
+
+/* ---------- render & events ---------- */
+const app=$("app");
+function render(){
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.view===view));
+  const fns={dash:viewDash,trades:viewTrades,cal:viewCal,cash:viewCash,rev:viewRev,set:viewSet};
+  let html=fns[view]();
+  if(flash)html=`<div class="msg ${flash.t}">${esc(flash.m)}</div>`+html;
+  flash=null;
+  app.innerHTML=html;
+  if(DR.trade)updPreview();
+}
+function resetDrafts(){DR.trade=DR.cash=DR.rev=null;DR.orig=DR.origCash=DR.origRev=null;DR.arm=null;}
+
+document.addEventListener("click",e=>{
+  const el=e.target.closest("[data-view],[data-act]");
+  if(!el)return;
+  if(el.dataset.view){view=el.dataset.view;resetDrafts();render();window.scrollTo(0,0);return;}
+  const a=el.dataset.act;
+  switch(a){
+    case "newTrade": resetDrafts();DR.trade=blankTrade();break;
+    case "editTrade":{const t=S.trades.find(x=>x.id===el.dataset.id);if(t){resetDrafts();DR.trade=Object.assign({},t);DR.orig=t.id;}break;}
+    case "cancelTrade": resetDrafts();break;
+    case "saveTrade": saveTrade();return;
+    case "delTrade": delTrade();return;
+    case "newId": DR.trade.id=genId("TR",DR.trade.entryDate);break;
+    case "newCash": resetDrafts();DR.cash=blankCash();break;
+    case "editCash":{const x=S.cash.find(c=>c.id===el.dataset.id);if(x){resetDrafts();DR.cash=Object.assign({},x);DR.origCash=x.id;}break;}
+    case "cancelCash": resetDrafts();break;
+    case "saveCash": saveCash();return;
+    case "delCash":
+      if(DR.arm==="cash:"+DR.origCash){S.cash=S.cash.filter(x=>x.id!==DR.origCash);save();resetDrafts();flash={t:"ok",m:"Transaction deleted."};}
+      else DR.arm="cash:"+DR.origCash;
+      break;
+    case "newRev": resetDrafts();DR.rev=blankRev();break;
+    case "editRev":{const r=S.reviews.find(x=>x.rid===el.dataset.id);if(r){resetDrafts();DR.rev=Object.assign({},r);DR.origRev=r.rid;}break;}
+    case "cancelRev": resetDrafts();break;
+    case "saveRev": saveRev();return;
+    case "delRev":
+      if(DR.arm==="rev:"+DR.origRev){S.reviews=S.reviews.filter(x=>x.rid!==DR.origRev);save();resetDrafts();flash={t:"ok",m:"Review deleted."};}
+      else DR.arm="rev:"+DR.origRev;
+      break;
+    case "calNav":
+      calM+=+el.dataset.dir;
+      if(calM<0){calM=11;calY--;}
+      if(calM>11){calM=0;calY++;}
+      calDay=null;break;
+    case "calDay": calDay=calDay===el.dataset.day?null:el.dataset.day;break;
+    case "addAcc":
+      gather();S.settings.accounts.push({name:"",broker:"",ccy:"USD",start:null,startDate:"",maker:0,taker:0,exch:0,notes:""});break;
+    case "rmAcc":
+      gather();S.settings.accounts.splice(+el.dataset.i,1);save();break;
+    case "saveSettings":
+      gather();S.settings.accounts=S.settings.accounts.filter(x=>x.name);save();
+      flash={t:"ok",m:"Settings saved."};break;
+    case "copyBk":{
+      const t=$("bk");t.select();
+      let ok=false;try{ok=document.execCommand("copy");}catch(err){}
+      const m=$("cpmsg");if(m)m.textContent=ok?"Copied.":"Select the text and copy it manually.";
+      return;
+    }
+    case "importBk": importBk();return;
+    case "resetAll":
+      if($("bkok").value.trim()==="RESET"){S=defaults();save();resetDrafts();flash={t:"ok",m:"All data erased and sample data restored."};}
+      else flash={t:"err",m:"Type RESET in the box to erase all data."};
+      break;
+  }
+  render();
+});
+document.addEventListener("change",e=>{
+  const t=e.target;
+  if(t.dataset.f){F[t.dataset.f]=t.value;render();return;}
+  if(t.dataset.cal){
+    if(t.dataset.cal==="y")calY=+t.value||calY;
+    else if(t.dataset.cal==="m")calM=+t.value;
+    else calAcc=t.value;
+    calDay=null;render();return;
+  }
+});
+function onField(e){
+  const t=e.target;
+  if(t.hasAttribute("data-search")){
+    TSEARCH=t.value;const el=$("tlist");if(el)el.innerHTML=tradeListHtml();return;
+  }
+  const sc=t.dataset.scope;
+  if(sc&&DR[sc]){
+    DR[sc][t.dataset.k]=t.value;
+    if(sc==="trade")updPreview();
+  }
+}
+document.addEventListener("input",onField);
+document.addEventListener("change",onField);
+
+render();
+
+if("serviceWorker" in navigator && /^https?:/.test(location.protocol)){
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
+}
+
+})();
+</script>
+</body>
+</html>
